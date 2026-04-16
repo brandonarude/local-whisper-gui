@@ -37,7 +37,7 @@
 - [x] **06. GREEN: device detection** — `src/utils/device_detect.py` returning `list[Device]`.
 - [x] **07. RED: config persistence tests** — `tests/test_config.py`: round-trip theme / model / device / language / formats / geometry; unset keys return documented defaults; uses a temp `QSettings` scope so tests don't touch user settings.
 - [x] **08. GREEN: config persistence** — `src/utils/config.py` wrapping `QSettings` with typed getters/setters.
-- [ ] **09. Theme manager** — `src/utils/theme.py` (apply light/dark/system palettes, detect via `QStyleHints.colorScheme()`); smoke test asserts `apply_theme` runs for each mode without raising.
+- [x] **09. Theme manager** — `src/utils/theme.py` (apply light/dark/system palettes, detect via `QStyleHints.colorScheme()`); smoke test asserts `apply_theme` runs for each mode without raising.
 
 ## Phase 3 — Audio core (TDD pairs)
 
