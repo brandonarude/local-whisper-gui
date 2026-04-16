@@ -63,12 +63,32 @@ These come from `SPEC.md` and matter across multiple files:
 
 ## Commands
 
-The project doesn't have a toolchain yet. Once commits 01–02 of `PLAN.md`
-land, update this section with the real invocations. Until then, the expected
-stack from `SPEC.md` §2 is: Python 3.10+, PyQt6, faster-whisper, pydub,
-numpy, pyqtgraph, pytest + pytest-qt + pytest-mock for tests, PyInstaller
-for packaging. **ffmpeg is a required system dependency** — if it's missing
-on the dev machine, several tests (and the app) won't run.
+Dev setup (one-time):
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+```
+
+Run tests:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/pytest
+```
+
+`QT_QPA_PLATFORM=offscreen` keeps PyQt6 headless so tests don't need a
+display server (WSL, CI). Drop it when you want widgets to actually render
+while debugging.
+
+Run the app (once commit 03 lands):
+
+```bash
+.venv/bin/python -m src.main
+```
+
+**ffmpeg is a required system dependency** — if it's missing on the dev
+machine, several tests (and the app) won't run. Install via your package
+manager (`apt install ffmpeg`, etc.).
 
 ## Out of scope for v0.1
 

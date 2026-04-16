@@ -27,7 +27,7 @@
 ## Phase 1 — Foundation
 
 - [x] **01. Project scaffolding** — directory tree per §9; `requirements.txt`; `requirements-dev.txt` (pytest, pytest-qt, pytest-mock, numpy); `.gitignore`; stub `README.md`.
-- [ ] **02. Test infrastructure** — `pytest.ini` / `pyproject.toml` pytest config, `tests/conftest.py` with `qapp` fixture and `tiny_wav` generator (1-second 440Hz sine via numpy), smoke test that imports `src` and asserts `QApplication` can be created.
+- [x] **02. Test infrastructure** — `pytest.ini` / `pyproject.toml` pytest config, `tests/conftest.py` with `qapp` fixture and `tiny_wav` generator (1-second 440Hz sine via numpy), smoke test that imports `src` and asserts `QApplication` can be created.
 - [ ] **03. App entry point** — `src/main.py` + `src/app.py`: launches an empty `QMainWindow` titled "Local Whisper GUI"; smoke test asserts window class instantiates.
 - [ ] **04. Constants module** — `src/utils/constants.py`: Whisper model list + VRAM hints, language list, chunking defaults, overlap seconds. Trivial assertion test (non-empty, English present, defaults in range).
 
