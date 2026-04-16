@@ -43,7 +43,7 @@
 
 - [x] **10. RED: audio load/probe tests** — `tests/test_audio_processor.py::test_probe_*`: correct duration/sample-rate/channels/size for the `tiny_wav` fixture; missing-file raises; non-audio-file raises.
 - [x] **11. GREEN: audio load/probe** — `src/core/audio_processor.py` probe via `pydub.utils.mediainfo`.
-- [ ] **12. RED: waveform extraction tests** — same test file: `generate_waveform_samples` returns exactly `target_points`, mono float array in `[-1, 1]`, monotonic time axis.
+- [x] **12. RED: waveform extraction tests** — same test file: `generate_waveform_samples` returns exactly `target_points`, mono float array in `[-1, 1]`, monotonic time axis.
 - [ ] **13. GREEN: waveform extraction** — downsampled peak extraction with numpy.
 - [ ] **14. RED: chunking tests** — fixture: long wav of sine + inserted silence; asserts chunk count matches expected, no chunk shorter than `min_chunk`, none longer than `max_chunk`, consecutive chunks overlap by ~2s, full audio coverage (sum of non-overlap durations ≈ total).
 - [ ] **15. GREEN: chunking** — `chunk_audio()` using `pydub.silence.split_on_silence` + min/max enforcement + overlap per §6.
