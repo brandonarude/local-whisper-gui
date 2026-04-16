@@ -33,7 +33,7 @@
 
 ## Phase 2 — Utilities (TDD pairs)
 
-- [ ] **05. RED: device detection tests** — `tests/test_device_detect.py` covers: CPU always present; CUDA-absent case (mock `torch.cuda.is_available() = False`) → only CPU; CUDA-present case (mock device count + name + vram) → GPU entry with expected fields.
+- [x] **05. RED: device detection tests** — `tests/test_device_detect.py` covers: CPU always present; CUDA-absent case (mock `torch.cuda.is_available() = False`) → only CPU; CUDA-present case (mock device count + name + vram) → GPU entry with expected fields.
 - [ ] **06. GREEN: device detection** — `src/utils/device_detect.py` returning `list[Device]`.
 - [ ] **07. RED: config persistence tests** — `tests/test_config.py`: round-trip theme / model / device / language / formats / geometry; unset keys return documented defaults; uses a temp `QSettings` scope so tests don't touch user settings.
 - [ ] **08. GREEN: config persistence** — `src/utils/config.py` wrapping `QSettings` with typed getters/setters.
