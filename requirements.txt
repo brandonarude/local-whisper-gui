@@ -1,0 +1,5 @@
+faster-whisper
+PyQt6
+pydub
+numpy
+pyqtgraph
