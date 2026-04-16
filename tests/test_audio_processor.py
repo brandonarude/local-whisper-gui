@@ -8,9 +8,14 @@ and clear errors for missing or non-audio files.
 Waveform extraction downsamples the audio to a fixed number of peak-amplitude
 points suitable for rendering in pyqtgraph. Output is mono, float, in [-1, 1],
 paired with a monotonic time axis in seconds.
+
+Chunking splits long audio on silence (pydub.silence), enforces min/max chunk
+durations, and adds a small overlap at each boundary so the transcription
+stitcher can align chunk outputs (SPEC §3.3, §6).
 """
 from __future__ import annotations
 
+import wave
 from pathlib import Path
 
 import numpy as np
@@ -128,3 +133,145 @@ def test_waveform_missing_file_raises(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError):
         generate_waveform_samples(tmp_path / "nope.wav", target_points=100)
+
+
+# --- chunking --------------------------------------------------------------
+
+
+@pytest.fixture
+def long_wav_with_silences(tmp_path: Path) -> Path:
+    """22-second mono wav: three 6s tones separated by silence gaps of 1s and 2s.
+
+    Layout (seconds): [0..6] tone, [6..7] silence, [7..13] tone,
+                      [13..15] silence, [15..21] tone, [21..22] silence.
+    """
+    sample_rate = 16_000
+    freq_hz = 440.0
+
+    def tone(duration_s: float) -> np.ndarray:
+        n = int(sample_rate * duration_s)
+        t = np.linspace(0.0, duration_s, n, endpoint=False)
+        return (0.5 * np.sin(2.0 * np.pi * freq_hz * t)).astype(np.float32)
+
+    def silence(duration_s: float) -> np.ndarray:
+        return np.zeros(int(sample_rate * duration_s), dtype=np.float32)
+
+    segments = [
+        tone(6.0), silence(1.0),
+        tone(6.0), silence(2.0),
+        tone(6.0), silence(1.0),
+    ]
+    pcm16 = (np.concatenate(segments) * 32767).astype(np.int16)
+
+    path = tmp_path / "long.wav"
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm16.tobytes())
+    return path
+
+
+def test_chunk_count_matches_silence_gaps(long_wav_with_silences: Path) -> None:
+    from src.core.audio_processor import chunk_audio
+
+    chunks = chunk_audio(
+        long_wav_with_silences,
+        min_silence_ms=500,
+        silence_thresh_db=-40.0,
+        min_chunk_s=1.0,
+        max_chunk_s=30.0,
+        overlap_s=1.0,
+    )
+    # Three tones separated by two silences of length > min_silence_ms.
+    assert len(chunks) == 3
+
+
+def test_chunks_respect_min_chunk_duration(long_wav_with_silences: Path) -> None:
+    from src.core.audio_processor import chunk_audio
+
+    chunks = chunk_audio(
+        long_wav_with_silences,
+        min_silence_ms=500,
+        silence_thresh_db=-40.0,
+        min_chunk_s=2.0,
+        max_chunk_s=30.0,
+        overlap_s=0.5,
+    )
+    for c in chunks:
+        assert (c.end_s - c.start_s) >= 2.0 - 1e-3
+
+
+def test_chunks_respect_max_chunk_duration(long_wav_with_silences: Path) -> None:
+    from src.core.audio_processor import chunk_audio
+
+    # Force further splitting: each silence-split chunk is ~6s, max is 4s.
+    chunks = chunk_audio(
+        long_wav_with_silences,
+        min_silence_ms=500,
+        silence_thresh_db=-40.0,
+        min_chunk_s=0.5,
+        max_chunk_s=4.0,
+        overlap_s=0.5,
+    )
+    for c in chunks:
+        assert (c.end_s - c.start_s) <= 4.0 + 0.2
+
+
+def test_consecutive_chunks_overlap_by_requested_amount(long_wav_with_silences: Path) -> None:
+    from src.core.audio_processor import chunk_audio
+
+    overlap_s = 1.0
+    chunks = chunk_audio(
+        long_wav_with_silences,
+        min_silence_ms=500,
+        silence_thresh_db=-40.0,
+        min_chunk_s=1.0,
+        max_chunk_s=30.0,
+        overlap_s=overlap_s,
+    )
+    assert len(chunks) >= 2
+    for prev, curr in zip(chunks, chunks[1:]):
+        assert prev.end_s - curr.start_s == pytest.approx(overlap_s, abs=0.1)
+
+
+def test_chunks_cover_audio_content(long_wav_with_silences: Path) -> None:
+    from src.core.audio_processor import chunk_audio
+
+    overlap_s = 1.0
+    chunks = chunk_audio(
+        long_wav_with_silences,
+        min_silence_ms=500,
+        silence_thresh_db=-40.0,
+        min_chunk_s=1.0,
+        max_chunk_s=30.0,
+        overlap_s=overlap_s,
+    )
+    # Sum of non-overlap durations ≈ content duration (18s of tone + some
+    # silence padding left by pydub's keep_silence trimming). Loose bounds
+    # to tolerate padding without accepting a completely wrong result.
+    total_non_overlap = sum(c.end_s - c.start_s for c in chunks) - overlap_s * (len(chunks) - 1)
+    assert 16.0 < total_non_overlap < 22.0
+
+
+def test_chunks_have_monotonic_start_times(long_wav_with_silences: Path) -> None:
+    from src.core.audio_processor import chunk_audio
+
+    chunks = chunk_audio(
+        long_wav_with_silences,
+        min_silence_ms=500,
+        silence_thresh_db=-40.0,
+        min_chunk_s=1.0,
+        max_chunk_s=30.0,
+        overlap_s=1.0,
+    )
+    starts = [c.start_s for c in chunks]
+    assert starts == sorted(starts)
+    assert [c.index for c in chunks] == list(range(len(chunks)))
+
+
+def test_chunk_audio_missing_file_raises(tmp_path: Path) -> None:
+    from src.core.audio_processor import chunk_audio
+
+    with pytest.raises(FileNotFoundError):
+        chunk_audio(tmp_path / "nope.wav")
