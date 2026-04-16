@@ -41,7 +41,7 @@
 
 ## Phase 3 — Audio core (TDD pairs)
 
-- [ ] **10. RED: audio load/probe tests** — `tests/test_audio_processor.py::test_probe_*`: correct duration/sample-rate/channels/size for the `tiny_wav` fixture; missing-file raises; non-audio-file raises.
+- [x] **10. RED: audio load/probe tests** — `tests/test_audio_processor.py::test_probe_*`: correct duration/sample-rate/channels/size for the `tiny_wav` fixture; missing-file raises; non-audio-file raises.
 - [ ] **11. GREEN: audio load/probe** — `src/core/audio_processor.py` probe via `pydub.utils.mediainfo`.
 - [ ] **12. RED: waveform extraction tests** — same test file: `generate_waveform_samples` returns exactly `target_points`, mono float array in `[-1, 1]`, monotonic time axis.
 - [ ] **13. GREEN: waveform extraction** — downsampled peak extraction with numpy.
