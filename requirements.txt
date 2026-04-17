@@ -1,6 +1,5 @@
 faster-whisper
 PyQt6
 pydub
-pyaudioop
 numpy
 pyqtgraph
