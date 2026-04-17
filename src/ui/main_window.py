@@ -9,6 +9,7 @@ panel but perform no work.
 """
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
@@ -33,7 +34,9 @@ from src.ui.progress_panel import ProgressPanel
 from src.ui.settings_panel import SettingsPanel
 from src.ui.waveform_widget import WaveformWidget
 from src.utils import constants as C
+from src.utils import disk_space
 from src.utils.device_detect import Device, detect_devices
+from src.utils.errors import ErrorKind
 from src.utils.theme import Theme, apply_theme
 from src.workers.chunk_preview_worker import ChunkPreviewWorker
 from src.workers.transcription_worker import ChunkParams, TranscriptionWorker
@@ -376,12 +379,38 @@ class MainWindow(QMainWindow):
         if dialogs.prompt_partial_output_on_cancel(self, len(results), total_planned):
             self._export_results(results, partial=True)
 
-    def _on_transcription_failed(self, message: str) -> None:
+    def _on_transcription_failed(self, message: str, kind: str) -> None:
         self._progress_panel.set_running(False)
         self._progress_panel.set_file_loaded(self._file_header.current_info is not None)
         self._progress_panel.append_log(f"Transcription failed: {message}")
-        QMessageBox.critical(self, "Transcription failed", message)
         self._transcription_worker = None
+
+        retry = False
+        if kind == ErrorKind.CUDA_OOM.value:
+            retry = dialogs.prompt_oom_retry(self, detail=message)
+        elif kind == ErrorKind.MODEL_DOWNLOAD.value:
+            retry = dialogs.prompt_download_retry(self, detail=message)
+        elif kind == ErrorKind.AUDIO_DECODE.value:
+            dialogs.show_error(
+                self,
+                "Could not decode audio",
+                "The audio file could not be decoded. It may be corrupted "
+                "or in an unsupported format.",
+                details=message,
+            )
+        elif kind == ErrorKind.DISK_FULL.value:
+            dialogs.show_error(
+                self,
+                "Disk full",
+                "The disk ran out of space during transcription. Free up "
+                "space and try again.",
+                details=message,
+            )
+        else:
+            dialogs.show_error(self, "Transcription failed", message)
+
+        if retry:
+            self._on_start_transcription()
 
     # --- export --------------------------------------------------------
 
@@ -411,6 +440,25 @@ class MainWindow(QMainWindow):
                 details=str(exc),
             )
             return
+
+        needed = disk_space.estimate_export_size(segments, values.output_formats)
+        if not disk_space.has_sufficient_free_space(out_dir, needed):
+            try:
+                free = shutil.disk_usage(
+                    str(out_dir if out_dir.exists() else out_dir.parent)
+                ).free
+            except OSError:
+                free = 0
+            if not dialogs.prompt_low_disk_space(
+                self,
+                needed_bytes=needed,
+                free_bytes=free,
+                output_dir=out_dir,
+            ):
+                self._progress_panel.append_log(
+                    "Export cancelled — insufficient disk space."
+                )
+                return
 
         stem = info.path.stem + (".partial" if partial else "")
         writers = {

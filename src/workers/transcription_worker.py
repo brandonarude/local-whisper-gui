@@ -32,6 +32,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from src.core.audio_processor import chunk_audio
 from src.core.stitcher import ChunkResult
 from src.core.transcriber import Transcriber
+from src.utils.errors import classify
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,7 @@ class TranscriptionWorker(QThread):
     log = pyqtSignal(str)
     completed = pyqtSignal(list)                  # list[ChunkResult]
     cancelled = pyqtSignal(list)                  # list[ChunkResult] (partial)
-    failed = pyqtSignal(str)
+    failed = pyqtSignal(str, str)                 # message, ErrorKind.value
 
     def __init__(
         self,
@@ -140,7 +141,8 @@ class TranscriptionWorker(QThread):
 
             self.completed.emit(results)
         except Exception as exc:  # pragma: no cover - surfaced via `failed`
-            self.failed.emit(f"{type(exc).__name__}: {exc}")
+            kind = classify(exc)
+            self.failed.emit(f"{type(exc).__name__}: {exc}", kind.value)
 
     # --- planning -------------------------------------------------------
 

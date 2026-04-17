@@ -146,6 +146,75 @@ def test_show_startup_warning_no_checkbox_when_disallowed(qtbot) -> None:
         )
 
 
+def _click_role(role: QMessageBox.ButtonRole):
+    def fake_clicked(self):
+        return next(
+            b for b in self.buttons() if self.buttonRole(b) == role
+        )
+    return fake_clicked
+
+
+def test_prompt_oom_retry_accept(qtbot) -> None:
+    from src.ui import dialogs
+
+    with patch.object(QMessageBox, "exec", lambda self: 0), patch.object(
+        QMessageBox, "clickedButton", _click_role(QMessageBox.ButtonRole.AcceptRole)
+    ):
+        assert dialogs.prompt_oom_retry(None, detail="cuda oom") is True
+
+
+def test_prompt_oom_retry_reject(qtbot) -> None:
+    from src.ui import dialogs
+
+    with patch.object(QMessageBox, "exec", lambda self: 0), patch.object(
+        QMessageBox, "clickedButton", _click_role(QMessageBox.ButtonRole.RejectRole)
+    ):
+        assert dialogs.prompt_oom_retry(None) is False
+
+
+def test_prompt_download_retry_accept(qtbot) -> None:
+    from src.ui import dialogs
+
+    with patch.object(QMessageBox, "exec", lambda self: 0), patch.object(
+        QMessageBox, "clickedButton", _click_role(QMessageBox.ButtonRole.AcceptRole)
+    ):
+        assert dialogs.prompt_download_retry(None, detail="timeout") is True
+
+
+def test_prompt_low_disk_space_proceed(qtbot, tmp_path: Path) -> None:
+    from src.ui import dialogs
+
+    with patch.object(QMessageBox, "exec", lambda self: 0), patch.object(
+        QMessageBox, "clickedButton", _click_role(QMessageBox.ButtonRole.AcceptRole)
+    ):
+        assert (
+            dialogs.prompt_low_disk_space(
+                None,
+                needed_bytes=10 * (1 << 20),
+                free_bytes=2 * (1 << 20),
+                output_dir=tmp_path,
+            )
+            is True
+        )
+
+
+def test_prompt_low_disk_space_cancel(qtbot, tmp_path: Path) -> None:
+    from src.ui import dialogs
+
+    with patch.object(QMessageBox, "exec", lambda self: 0), patch.object(
+        QMessageBox, "clickedButton", _click_role(QMessageBox.ButtonRole.RejectRole)
+    ):
+        assert (
+            dialogs.prompt_low_disk_space(
+                None,
+                needed_bytes=10 * (1 << 20),
+                free_bytes=2 * (1 << 20),
+                output_dir=tmp_path,
+            )
+            is False
+        )
+
+
 def test_describe_load_error_formats_message(tmp_path: Path) -> None:
     from src.ui.dialogs import describe_load_error
 

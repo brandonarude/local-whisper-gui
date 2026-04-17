@@ -103,6 +103,74 @@ def show_missing_faster_whisper(parent: QWidget | None) -> None:
     box.exec()
 
 
+def prompt_oom_retry(parent: QWidget | None, detail: str = "") -> bool:
+    """GPU ran out of memory (SPEC §7). Returns True if the user wants to
+    retry with current settings; False if they'll adjust first."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Critical)
+    box.setWindowTitle("Out of memory")
+    box.setText(
+        "Transcription ran out of GPU memory. Try a smaller model, "
+        "switch to CPU, or close other GPU-using apps."
+    )
+    if detail:
+        box.setDetailedText(detail)
+    retry = box.addButton("Retry", QMessageBox.ButtonRole.AcceptRole)
+    box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(retry)
+    box.exec()
+    return box.clickedButton() is retry
+
+
+def prompt_download_retry(parent: QWidget | None, detail: str = "") -> bool:
+    """Model download failed (SPEC §7). Returns True to retry."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle("Model download failed")
+    box.setText(
+        "The faster-whisper model could not be downloaded. Check your "
+        "network connection and try again."
+    )
+    if detail:
+        box.setDetailedText(detail)
+    retry = box.addButton("Retry", QMessageBox.ButtonRole.AcceptRole)
+    box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(retry)
+    box.exec()
+    return box.clickedButton() is retry
+
+
+def _format_bytes(n: int) -> str:
+    for unit, div in (("GB", 1 << 30), ("MB", 1 << 20), ("KB", 1 << 10)):
+        if n >= div:
+            return f"{n / div:.1f} {unit}"
+    return f"{n} B"
+
+
+def prompt_low_disk_space(
+    parent: QWidget | None,
+    *,
+    needed_bytes: int,
+    free_bytes: int,
+    output_dir: str | Path,
+) -> bool:
+    """Pre-export disk-space warning (SPEC §7). Returns True to proceed
+    anyway, False to cancel the export."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle("Low disk space")
+    box.setText(
+        f"Output directory {Path(output_dir)} has {_format_bytes(free_bytes)} free, "
+        f"but the export is estimated at {_format_bytes(needed_bytes)}."
+    )
+    box.setInformativeText("Proceed with the export anyway?")
+    proceed = box.addButton("Export anyway", QMessageBox.ButtonRole.AcceptRole)
+    box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(proceed)
+    box.exec()
+    return box.clickedButton() is proceed
+
+
 def show_startup_warning(
     parent: QWidget | None,
     *,
