@@ -50,7 +50,7 @@
 
 ## Phase 4 — Core logic (TDD pairs)
 
-- [ ] **16. RED: exporter tests** — synthetic `[Segment]` input → asserts `.txt` (with and without timestamps), `.srt` parses back via a minimal SRT parser, `.vtt` starts with `WEBVTT`, `.json` contains word-level data when provided.
+- [x] **16. RED: exporter tests** — synthetic `[Segment]` input → asserts `.txt` (with and without timestamps), `.srt` parses back via a minimal SRT parser, `.vtt` starts with `WEBVTT`, `.json` contains word-level data when provided.
 - [ ] **17. GREEN: exporter** — `src/core/exporter.py`.
 - [ ] **18. RED: ETA estimator tests** — feed synthetic `(audio_secs_done, wall_secs_elapsed)` observations; assert `.remaining()` converges; zero-elapsed returns `None`; handles non-monotonic updates.
 - [ ] **19. GREEN: ETA estimator** — `src/core/estimator.py` sliding-window throughput.
