@@ -9,7 +9,9 @@ panel but perform no work.
 """
 from __future__ import annotations
 
+from PyQt6.QtGui import QActionGroup
 from PyQt6.QtWidgets import (
+    QApplication,
     QMainWindow,
     QMessageBox,
     QSplitter,
@@ -25,6 +27,7 @@ from src.ui.settings_panel import SettingsPanel
 from src.ui.waveform_widget import WaveformWidget
 from src.utils import constants as C
 from src.utils.device_detect import Device, detect_devices
+from src.utils.theme import Theme, apply_theme
 from src.workers.waveform_worker import WaveformWorker
 
 APP_NAME = "Local Whisper GUI"
@@ -71,6 +74,9 @@ class MainWindow(QMainWindow):
         self._refresh_status_bar()
 
         self._waveform_worker: WaveformWorker | None = None
+        self._current_theme: str = Theme.SYSTEM.value
+
+        self._build_menu_bar()
 
         self._file_header.file_loaded.connect(self._on_file_loaded)
         self._file_header.load_failed.connect(self._on_load_failed)
@@ -110,6 +116,83 @@ class MainWindow(QMainWindow):
             if key == device_key:
                 return d.label
         return device_key
+
+    # --- menu bar -------------------------------------------------------
+
+    def _build_menu_bar(self) -> None:
+        mb = self.menuBar()
+
+        file_menu = mb.addMenu("&File")
+        load_action = file_menu.addAction("&Load Audio File…")
+        load_action.setShortcut("Ctrl+O")
+        load_action.triggered.connect(self._file_header._on_load_clicked)
+        file_menu.addSeparator()
+        quit_action = file_menu.addAction("&Quit")
+        quit_action.setShortcut("Ctrl+Q")
+        quit_action.triggered.connect(self.close)
+
+        settings_menu = mb.addMenu("&Settings")
+        theme_menu = settings_menu.addMenu("&Theme")
+        self._theme_actions: dict[str, "object"] = {}
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        for theme in (Theme.LIGHT, Theme.DARK, Theme.SYSTEM):
+            act = theme_menu.addAction(theme.value.capitalize())
+            act.setCheckable(True)
+            act.setActionGroup(group)
+            act.setChecked(theme.value == self._current_theme)
+            act.triggered.connect(lambda _checked, t=theme.value: self.set_theme(t))
+            self._theme_actions[theme.value] = act
+
+        settings_menu.addSeparator()
+        predownload_action = settings_menu.addAction("Pre-download Model…")
+        predownload_action.triggered.connect(self._on_predownload_model)
+        clear_cache_action = settings_menu.addAction("Clear Cached Models…")
+        clear_cache_action.triggered.connect(self._on_clear_model_cache)
+
+        help_menu = mb.addMenu("&Help")
+        about_action = help_menu.addAction("&About")
+        about_action.triggered.connect(self._on_about)
+
+    def set_theme(self, theme: str) -> None:
+        app = QApplication.instance()
+        if app is None:
+            return
+        apply_theme(app, theme)
+        self._current_theme = theme
+        act = self._theme_actions.get(theme)
+        if act is not None:
+            act.setChecked(True)
+
+    def current_theme(self) -> str:
+        return self._current_theme
+
+    # --- menu action stubs ----------------------------------------------
+
+    def _on_predownload_model(self) -> None:
+        QMessageBox.information(
+            self,
+            "Pre-download Model",
+            "Model pre-download will be wired up in a later commit.",
+        )
+
+    def _on_clear_model_cache(self) -> None:
+        QMessageBox.information(
+            self,
+            "Clear Cached Models",
+            "Model cache management will be wired up in a later commit.",
+        )
+
+    def _on_about(self) -> None:
+        QMessageBox.about(
+            self,
+            f"About {APP_NAME}",
+            (
+                f"{APP_NAME}\n\n"
+                "Local transcription powered by faster-whisper.\n"
+                "See SPEC.md for details."
+            ),
+        )
 
     def _refresh_status_bar(self) -> None:
         v = self._settings_panel.values()
