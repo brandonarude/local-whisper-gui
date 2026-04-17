@@ -1,10 +1,26 @@
 """Program entry point: `python -m src.main`."""
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
 
-from src.app import MainWindow, create_application, handle_startup_checks
-from src.utils.config import Config
+
+def _register_bundled_binaries() -> None:
+    # In a PyInstaller onedir/onefile build, ffmpeg.exe/ffprobe.exe ship
+    # alongside the frozen exe (see build/build_windows.spec). pydub resolves
+    # them via shutil.which(), which only searches PATH — the exe's own
+    # directory is not on PATH — so prepend it here before pydub imports.
+    if not getattr(sys, "frozen", False):
+        return
+    bundle_dir = Path(sys.executable).resolve().parent
+    os.environ["PATH"] = str(bundle_dir) + os.pathsep + os.environ.get("PATH", "")
+
+
+_register_bundled_binaries()
+
+from src.app import MainWindow, create_application, handle_startup_checks  # noqa: E402
+from src.utils.config import Config  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
