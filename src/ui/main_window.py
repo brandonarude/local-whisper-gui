@@ -9,6 +9,9 @@ panel but perform no work.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QActionGroup
 from PyQt6.QtWidgets import (
     QApplication,
@@ -18,12 +21,13 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PyQt6.QtCore import Qt
 
+from src.core import exporter
 from src.core.audio_processor import AudioInfo
 from src.core.estimator import Estimator
-from src.core.stitcher import ChunkResult
+from src.core.stitcher import ChunkResult, stitch
 from src.core.transcriber import Transcriber
+from src.ui import dialogs
 from src.ui.file_header import FileHeader
 from src.ui.progress_panel import ProgressPanel
 from src.ui.settings_panel import SettingsPanel
@@ -355,6 +359,7 @@ class MainWindow(QMainWindow):
             f"Transcription complete ({len(results)} chunk(s))."
         )
         self._transcription_worker = None
+        self._export_results(self._transcription_results, partial=False)
 
     def _on_transcription_cancelled(self, results: list) -> None:
         self._transcription_results = list(results)
@@ -365,12 +370,78 @@ class MainWindow(QMainWindow):
         )
         self._transcription_worker = None
 
+        if not results:
+            return
+        total_planned = max(len(results), 1)
+        if dialogs.prompt_partial_output_on_cancel(self, len(results), total_planned):
+            self._export_results(results, partial=True)
+
     def _on_transcription_failed(self, message: str) -> None:
         self._progress_panel.set_running(False)
         self._progress_panel.set_file_loaded(self._file_header.current_info is not None)
         self._progress_panel.append_log(f"Transcription failed: {message}")
         QMessageBox.critical(self, "Transcription failed", message)
         self._transcription_worker = None
+
+    # --- export --------------------------------------------------------
+
+    def _export_results(self, results: list[ChunkResult], *, partial: bool) -> None:
+        info = self._file_header.current_info
+        if info is None or not results:
+            return
+
+        values = self._settings_panel.values()
+        if not values.output_formats:
+            self._progress_panel.append_log("No output formats selected — skipping export.")
+            return
+
+        segments = stitch(results, C.CHUNK_OVERLAP_SECONDS)
+        if not segments:
+            self._progress_panel.append_log("Stitcher produced no segments — nothing to export.")
+            return
+
+        out_dir = Path(values.output_dir) if values.output_dir else info.path.parent
+        try:
+            out_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            dialogs.show_error(
+                self,
+                "Export failed",
+                f"Could not create output directory: {out_dir}",
+                details=str(exc),
+            )
+            return
+
+        stem = info.path.stem + (".partial" if partial else "")
+        writers = {
+            "txt": lambda p: exporter.write_txt(
+                segments, p, include_timestamps=values.include_timestamps
+            ),
+            "srt": lambda p: exporter.write_srt(segments, p),
+            "vtt": lambda p: exporter.write_vtt(segments, p),
+            "json": lambda p: exporter.write_json(segments, p),
+        }
+        written: list[Path] = []
+        for fmt in values.output_formats:
+            writer = writers.get(fmt)
+            if writer is None:
+                continue
+            out_path = out_dir / f"{stem}.{fmt}"
+            try:
+                writer(out_path)
+            except OSError as exc:
+                dialogs.show_error(
+                    self,
+                    "Export failed",
+                    f"Could not write {out_path.name}",
+                    details=str(exc),
+                )
+                return
+            written.append(out_path)
+            self._progress_panel.append_log(f"Wrote {out_path.name}")
+
+        if written:
+            dialogs.show_export_complete(self, out_dir, written)
 
 
 # --- module-level helpers ---------------------------------------------------

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PyQt6.QtCore import QUrl
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QMessageBox, QWidget
 
 
@@ -88,3 +90,23 @@ def show_missing_ffmpeg(parent: QWidget | None) -> None:
 def describe_load_error(path: str | Path, exc: BaseException) -> str:
     """Format a consistent 'failed to load X' message used by the main window."""
     return f"Could not load {Path(path).name}: {type(exc).__name__}: {exc}"
+
+
+def show_export_complete(
+    parent: QWidget | None,
+    output_dir: str | Path,
+    files: list[str | Path],
+) -> None:
+    """Success notification with an "Open folder" button (SPEC §5.4)."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Information)
+    box.setWindowTitle("Transcription complete")
+    file_list = "\n".join(f"• {Path(f).name}" for f in files)
+    box.setText(f"Wrote {len(files)} file(s) to:\n{output_dir}")
+    if file_list:
+        box.setInformativeText(file_list)
+    open_btn = box.addButton("Open folder", QMessageBox.ButtonRole.ActionRole)
+    box.addButton(QMessageBox.StandardButton.Ok)
+    box.exec()
+    if box.clickedButton() is open_btn:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(output_dir)))

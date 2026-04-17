@@ -92,8 +92,15 @@ def long_wav(tmp_path: Path) -> Path:
     return path
 
 
-def test_start_runs_transcription_and_populates_results(qtbot, tiny_wav: Path) -> None:
+def test_start_runs_transcription_and_populates_results(
+    qtbot, tiny_wav: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.ui import main_window as mw_mod
     from src.ui.main_window import MainWindow
+
+    # Export dialogs are modal QMessageBoxes — stub them out so the
+    # completed-path doesn't block the test.
+    monkeypatch.setattr(mw_mod.dialogs, "show_export_complete", lambda *a, **kw: None)
 
     fake = FakeTranscriber([[_seg(0.0, 0.5, "hello"), _seg(0.5, 1.0, "world")]])
     w = MainWindow(devices=_devices(), transcriber_factory=_factory(fake))
@@ -117,8 +124,17 @@ def test_start_runs_transcription_and_populates_results(qtbot, tiny_wav: Path) -
     assert not w._progress_panel._cancel_button.isEnabled()
 
 
-def test_cancel_preserves_completed_chunks(qtbot, long_wav: Path) -> None:
+def test_cancel_preserves_completed_chunks(
+    qtbot, long_wav: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.ui import main_window as mw_mod
     from src.ui.main_window import MainWindow
+
+    # Decline partial export so no follow-up dialog blocks the test.
+    monkeypatch.setattr(
+        mw_mod.dialogs, "prompt_partial_output_on_cancel",
+        lambda parent, completed, total: False,
+    )
 
     gate = threading.Event()
     fake = FakeTranscriber(

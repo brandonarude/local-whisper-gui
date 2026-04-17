@@ -75,7 +75,7 @@
 
 - [x] **33. Transcription worker** — `src/workers/transcription_worker.py` `QThread`; `pytest-qt` smoke test with the mocked transcriber asserting signal order (`chunk_started` → `segment` → `chunk_completed` → `finished`).
 - [x] **34. Wire Start/Cancel to worker** — progress panel receives worker signals; cancel triggers `requestInterruption()` and preserves completed chunks.
-- [ ] **35. Post-transcription export** — stitch → write selected formats → success notification with "Open folder"; on cancel, offer partial export.
+- [x] **35. Post-transcription export** — stitch → write selected formats → success notification with "Open folder"; on cancel, offer partial export.
 
 ## Phase 7 — Polish & robustness
 
