@@ -207,6 +207,55 @@ def describe_load_error(path: str | Path, exc: BaseException) -> str:
     return f"Could not load {Path(path).name}: {type(exc).__name__}: {exc}"
 
 
+def prompt_select_model_to_download(
+    parent: QWidget | None, models: list[str], default: str | None = None
+) -> str | None:
+    """Let the user pick a model from the Whisper list to pre-download.
+    Returns the selected name, or None if cancelled."""
+    from PyQt6.QtWidgets import QInputDialog
+
+    idx = 0
+    if default is not None and default in models:
+        idx = models.index(default)
+    name, ok = QInputDialog.getItem(
+        parent,
+        "Pre-download Model",
+        "Select a Whisper model to download now:",
+        models,
+        idx,
+        editable=False,
+    )
+    return name if ok and name else None
+
+
+def confirm_clear_model_cache(
+    parent: QWidget | None, *, model_names: list[str], total_bytes: int
+) -> bool:
+    """Confirm deleting cached Whisper models. Returns True to proceed."""
+    if not model_names:
+        box = QMessageBox(parent)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle("Clear Cached Models")
+        box.setText("No cached Whisper models found.")
+        box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        box.exec()
+        return False
+
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Question)
+    box.setWindowTitle("Clear Cached Models")
+    box.setText(
+        f"Delete {len(model_names)} cached Whisper model(s) "
+        f"({_format_bytes(total_bytes)})?"
+    )
+    box.setInformativeText("\n".join(f"• {n}" for n in model_names))
+    yes = box.addButton("Delete", QMessageBox.ButtonRole.AcceptRole)
+    box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(yes)
+    box.exec()
+    return box.clickedButton() is yes
+
+
 def show_export_complete(
     parent: QWidget | None,
     output_dir: str | Path,

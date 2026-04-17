@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
     QMessageBox,
+    QProgressDialog,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -34,12 +35,13 @@ from src.ui.progress_panel import ProgressPanel
 from src.ui.settings_panel import SettingsPanel
 from src.ui.waveform_widget import WaveformWidget
 from src.utils import constants as C
-from src.utils import disk_space
+from src.utils import disk_space, model_cache
 from src.utils.config import Config
 from src.utils.device_detect import Device, detect_devices
 from src.utils.errors import ErrorKind
 from src.utils.theme import Theme, apply_theme
 from src.workers.chunk_preview_worker import ChunkPreviewWorker
+from src.workers.model_download_worker import ModelDownloadWorker
 from src.workers.transcription_worker import ChunkParams, TranscriptionWorker
 from src.workers.waveform_worker import WaveformWorker
 
@@ -296,17 +298,60 @@ class MainWindow(QMainWindow):
     # --- menu action stubs ----------------------------------------------
 
     def _on_predownload_model(self) -> None:
-        QMessageBox.information(
-            self,
-            "Pre-download Model",
-            "Model pre-download will be wired up in a later commit.",
+        model_names = [m.name for m in C.MODELS]
+        current = self._settings_panel.values().model
+        chosen = dialogs.prompt_select_model_to_download(
+            self, model_names, default=current
         )
+        if not chosen:
+            return
+
+        progress = QProgressDialog(
+            f"Downloading {chosen}…", "Cancel", 0, 0, self
+        )
+        progress.setWindowTitle("Pre-download Model")
+        progress.setAutoClose(False)
+        progress.setMinimumDuration(0)
+
+        worker = ModelDownloadWorker(model=chosen, parent=self)
+
+        def _on_done():
+            progress.close()
+            QMessageBox.information(
+                self, "Pre-download Model", f"Model '{chosen}' is ready."
+            )
+
+        def _on_failed(message: str, kind: str):
+            progress.close()
+            if kind == ErrorKind.MODEL_DOWNLOAD.value:
+                if dialogs.prompt_download_retry(self, detail=message):
+                    self._on_predownload_model()
+            else:
+                dialogs.show_error(self, "Download failed", message)
+
+        worker.completed.connect(_on_done)
+        worker.failed.connect(_on_failed)
+        worker.finished.connect(worker.deleteLater)
+        progress.canceled.connect(worker.requestInterruption)
+        worker.start()
+        self._model_download_worker = worker  # keep reference alive
 
     def _on_clear_model_cache(self) -> None:
+        cache = model_cache.cache_dir()
+        names = model_cache.list_whisper_models(cache)
+        total = sum(
+            model_cache.total_size_bytes(d)
+            for d in model_cache.whisper_model_dirs(cache)
+        )
+        if not dialogs.confirm_clear_model_cache(
+            self, model_names=names, total_bytes=total
+        ):
+            return
+        freed = model_cache.clear_whisper_cache(cache)
         QMessageBox.information(
             self,
             "Clear Cached Models",
-            "Model cache management will be wired up in a later commit.",
+            f"Freed {model_cache.format_size(freed)}.",
         )
 
     def _on_about(self) -> None:
