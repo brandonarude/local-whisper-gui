@@ -64,7 +64,7 @@
 - [x] **24. Waveform worker** — `src/workers/waveform_worker.py` `QThread`; smoke test with `pytest-qt` `qtbot.waitSignal(samples_ready)` against the `tiny_wav` fixture.
 - [x] **25. Waveform widget** — `src/ui/waveform_widget.py` pyqtgraph wrapper; smoke test: instantiate, `set_samples`, `set_chunk_boundaries`, assert no exception.
 - [x] **26. File header + load flow** — "Load Audio File" button, file dialog, metadata labels, waveform wired via worker.
-- [ ] **27. Settings panel** — `src/ui/settings_panel.py`: model / device / language (searchable) / output formats / timestamps toggle / output dir / chunking group.
+- [x] **27. Settings panel** — `src/ui/settings_panel.py`: model / device / language (searchable) / output formats / timestamps toggle / output dir / chunking group.
 - [ ] **28. Progress panel skeleton** — `src/ui/progress_panel.py`: Start/Cancel buttons (disabled until file loaded), progress bar, ETA label, log view.
 - [ ] **29. Main window assembly** — compose all panels; status bar with device/model info.
 - [ ] **30. Menu bar + theme toggle** — File, Settings (Theme, Pre-download Model, Clear Cache), Help; help `?` tooltips on Model/Device.
