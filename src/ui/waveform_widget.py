@@ -16,6 +16,7 @@ from typing import Sequence
 
 import numpy as np
 import pyqtgraph as pg
+from PyQt6 import sip
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
@@ -43,6 +44,9 @@ class WaveformWidget(QWidget):
         self._duration_s: float = 0.0
 
     def set_samples(self, waveform: Waveform) -> None:
+        # Queued cross-thread slot: the widget may already be mid-teardown.
+        if sip.isdeleted(self) or sip.isdeleted(self._plot):
+            return
         times = np.asarray(waveform.times, dtype=np.float64)
         amps = np.asarray(waveform.amplitudes, dtype=np.float64)
         if self._curve is None:
@@ -54,11 +58,18 @@ class WaveformWidget(QWidget):
 
         if times.size:
             self._duration_s = float(times[-1])
-            self._plot.setXRange(0.0, self._duration_s, padding=0)
+            try:
+                self._plot.setXRange(0.0, self._duration_s, padding=0)
+            except RuntimeError:
+                # pyqtgraph internals (ViewBox.childGroup) can be torn down
+                # between the check above and this call during widget teardown.
+                return
         else:
             self._duration_s = 0.0
 
     def set_chunk_boundaries(self, boundaries_s: Sequence[float]) -> None:
+        if sip.isdeleted(self) or sip.isdeleted(self._plot):
+            return
         for line in self._boundary_lines:
             self._plot.removeItem(line)
         self._boundary_lines.clear()
