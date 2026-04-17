@@ -32,6 +32,9 @@ for pkg in ("faster_whisper", "ctranslate2", "av", "tokenizers", "huggingface_hu
     hiddenimports += pkg_hidden
 
 hiddenimports += collect_submodules("pyqtgraph")
+# audioop was removed from the stdlib in Python 3.13; pydub imports it
+# unconditionally. audioop-lts ships a drop-in ``audioop`` module.
+hiddenimports += ["audioop"]
 datas += [(ASSETS, "assets")]
 
 
