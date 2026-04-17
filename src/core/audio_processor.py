@@ -1,8 +1,12 @@
 """Audio file probing, waveform extraction, and silence-based chunking.
 
-Probing uses `pydub.utils.mediainfo`, which shells out to ffprobe. For missing
-files we raise `FileNotFoundError`; for files ffprobe cannot recognise as
-audio we raise `ValueError`.
+Probing uses `pydub.utils.mediainfo_json`, which shells out to ffprobe and
+returns structured per-stream info. We iterate the streams and pick the
+first one with ``codec_type == "audio"`` — files like Pixel Recorder m4a
+carry sidecar ``data`` streams that the legacy ``mediainfo`` text parser
+silently aliased over the audio stream's keys. For missing files we raise
+`FileNotFoundError`; for files ffprobe cannot recognise as audio we raise
+`ValueError`.
 
 Waveform extraction loads the file via pydub, downmixes to mono, and
 peak-downsamples the PCM samples into a fixed number of points suitable for
@@ -22,7 +26,7 @@ from pathlib import Path
 import numpy as np
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
-from pydub.utils import mediainfo
+from pydub.utils import mediainfo_json
 
 from src.utils.constants import (
     CHUNK_OVERLAP_SECONDS,
@@ -47,14 +51,22 @@ def probe(path: str | Path) -> AudioInfo:
     if not p.exists():
         raise FileNotFoundError(f"Audio file not found: {p}")
 
-    info = mediainfo(str(p))
-    if not info or info.get("codec_type") != "audio":
+    info = mediainfo_json(str(p))
+    streams = info.get("streams") if info else None
+    audio_stream = next(
+        (s for s in streams or [] if s.get("codec_type") == "audio"),
+        None,
+    )
+    if audio_stream is None:
         raise ValueError(f"Not a recognised audio file: {p}")
 
+    duration_raw = audio_stream.get("duration") or (info.get("format") or {}).get(
+        "duration"
+    )
     try:
-        duration_s = float(info["duration"])
-        sample_rate = int(info["sample_rate"])
-        channels = int(info["channels"])
+        duration_s = float(duration_raw)
+        sample_rate = int(audio_stream["sample_rate"])
+        channels = int(audio_stream["channels"])
     except (KeyError, TypeError, ValueError) as e:
         raise ValueError(f"Incomplete audio metadata for {p}: {e}") from e
 
