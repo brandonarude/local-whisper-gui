@@ -32,3 +32,16 @@ python -m src.main
 ```bash
 pytest
 ```
+
+## Build (Linux)
+
+ffmpeg is **not** bundled into the Linux build — install it from your
+distribution's package manager (`apt install ffmpeg`, `dnf install
+ffmpeg`, etc.) before running the frozen app.
+
+```bash
+pyinstaller build/build_linux.spec
+```
+
+The output directory is `dist/local-whisper-gui/`. CUDA support requires
+the user's existing NVIDIA driver + CUDA Toolkit install.
