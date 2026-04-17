@@ -21,6 +21,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from src.core.audio_processor import AudioInfo
+from src.core.estimator import Estimator
+from src.core.stitcher import ChunkResult
+from src.core.transcriber import Transcriber
 from src.ui.file_header import FileHeader
 from src.ui.progress_panel import ProgressPanel
 from src.ui.settings_panel import SettingsPanel
@@ -29,18 +32,25 @@ from src.utils import constants as C
 from src.utils.device_detect import Device, detect_devices
 from src.utils.theme import Theme, apply_theme
 from src.workers.chunk_preview_worker import ChunkPreviewWorker
+from src.workers.transcription_worker import ChunkParams, TranscriptionWorker
 from src.workers.waveform_worker import WaveformWorker
 
 APP_NAME = "Local Whisper GUI"
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, devices: list[Device] | None = None) -> None:
+    def __init__(
+        self,
+        devices: list[Device] | None = None,
+        *,
+        transcriber_factory=None,
+    ) -> None:
         super().__init__()
         self.setWindowTitle(APP_NAME)
         self.resize(1100, 820)
 
         self._devices = devices if devices is not None else detect_devices()
+        self._transcriber_factory = transcriber_factory or _default_transcriber_factory
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
@@ -76,6 +86,9 @@ class MainWindow(QMainWindow):
 
         self._waveform_worker: WaveformWorker | None = None
         self._chunk_preview_worker: ChunkPreviewWorker | None = None
+        self._transcription_worker: TranscriptionWorker | None = None
+        self._estimator: Estimator | None = None
+        self._transcription_results: list[ChunkResult] = []
         self._current_theme: str = Theme.SYSTEM.value
 
         self._build_menu_bar()
@@ -84,6 +97,8 @@ class MainWindow(QMainWindow):
         self._file_header.load_failed.connect(self._on_load_failed)
         self._settings_panel.values_changed.connect(self._refresh_status_bar)
         self._settings_panel.values_changed.connect(self._refresh_chunk_preview)
+        self._progress_panel.start_clicked.connect(self._on_start_transcription)
+        self._progress_panel.cancel_clicked.connect(self._on_cancel_transcription)
 
     # --- file loading ---------------------------------------------------
 
@@ -255,3 +270,139 @@ class MainWindow(QMainWindow):
         self._status.showMessage(
             f"Device: {self._device_label_for(v.device_key)}  |  Model: {model_text}"
         )
+
+    # --- transcription control -----------------------------------------
+
+    def _on_start_transcription(self) -> None:
+        info = self._file_header.current_info
+        if info is None:
+            return
+        if self._transcription_worker is not None and self._transcription_worker.isRunning():
+            return
+
+        values = self._settings_panel.values()
+        device, compute_type = _split_device_key(values.device_key)
+        transcriber = self._transcriber_factory(
+            model=values.model, device=device, compute_type=compute_type
+        )
+
+        params = ChunkParams(
+            min_silence_ms=values.min_silence_ms,
+            silence_thresh_db=float(values.silence_threshold_dbfs),
+            min_chunk_s=values.min_chunk_minutes * 60.0,
+            max_chunk_s=values.max_chunk_minutes * 60.0,
+            overlap_s=C.CHUNK_OVERLAP_SECONDS,
+        )
+
+        worker = TranscriptionWorker(
+            audio_path=info.path,
+            total_duration_s=info.duration_s,
+            transcriber=transcriber,
+            chunking_enabled=values.chunking_enabled,
+            chunk_params=params,
+            language=values.language,
+            parent=self,
+        )
+
+        self._estimator = Estimator(info.duration_s)
+        self._transcription_results = []
+
+        self._progress_panel.clear_log()
+        self._progress_panel.reset_progress()
+        self._progress_panel.set_running(True)
+
+        worker.chunk_started.connect(self._on_chunk_started)
+        worker.chunk_completed.connect(self._on_chunk_completed)
+        worker.progress.connect(self._on_transcription_progress)
+        worker.log.connect(self._progress_panel.append_log)
+        worker.completed.connect(self._on_transcription_completed)
+        worker.cancelled.connect(self._on_transcription_cancelled)
+        worker.failed.connect(self._on_transcription_failed)
+        worker.finished.connect(worker.deleteLater)
+
+        self._transcription_worker = worker
+        worker.start()
+
+    def _on_cancel_transcription(self) -> None:
+        w = self._transcription_worker
+        if w is None or not w.isRunning():
+            return
+        w.requestInterruption()
+        self._progress_panel.append_log("Cancellation requested — finishing current chunk...")
+
+    # --- worker signal handlers ----------------------------------------
+
+    def _on_chunk_started(self, index: int, total: int) -> None:
+        self._progress_panel.set_progress_text(f"chunk {index + 1}/{total} — %p%")
+
+    def _on_chunk_completed(self, index: int) -> None:  # noqa: ARG002
+        pass  # log message already added by the worker
+
+    def _on_transcription_progress(
+        self, percent: int, audio_done_s: float, wall_elapsed_s: float
+    ) -> None:
+        self._progress_panel.set_progress_percent(percent)
+        if self._estimator is not None:
+            self._estimator.update(audio_done_s, wall_elapsed_s)
+            remaining = self._estimator.remaining()
+            self._progress_panel.set_eta(_format_eta(remaining))
+
+    def _on_transcription_completed(self, results: list) -> None:
+        self._transcription_results = list(results)
+        self._progress_panel.set_running(False)
+        self._progress_panel.set_file_loaded(self._file_header.current_info is not None)
+        self._progress_panel.append_log(
+            f"Transcription complete ({len(results)} chunk(s))."
+        )
+        self._transcription_worker = None
+
+    def _on_transcription_cancelled(self, results: list) -> None:
+        self._transcription_results = list(results)
+        self._progress_panel.set_running(False)
+        self._progress_panel.set_file_loaded(self._file_header.current_info is not None)
+        self._progress_panel.append_log(
+            f"Transcription cancelled — {len(results)} chunk(s) preserved."
+        )
+        self._transcription_worker = None
+
+    def _on_transcription_failed(self, message: str) -> None:
+        self._progress_panel.set_running(False)
+        self._progress_panel.set_file_loaded(self._file_header.current_info is not None)
+        self._progress_panel.append_log(f"Transcription failed: {message}")
+        QMessageBox.critical(self, "Transcription failed", message)
+        self._transcription_worker = None
+
+
+# --- module-level helpers ---------------------------------------------------
+
+
+def _default_transcriber_factory(*, model: str, device: str, compute_type: str) -> Transcriber:
+    return Transcriber(model=model, device=device, compute_type=compute_type)
+
+
+def _split_device_key(device_key: str) -> tuple[str, str]:
+    """Translate the settings panel's device_key into faster-whisper args.
+
+    ``"cpu"`` → ``("cpu", "int8")``; ``"cuda:N"`` → ``("cuda", "float16")``.
+    Compute types are best-effort defaults; faster-whisper also accepts
+    ``"auto"`` but explicit values make the choice visible in the log.
+    """
+    if device_key.startswith("cuda"):
+        return "cuda", "float16"
+    return "cpu", "int8"
+
+
+def _format_eta(remaining_s: float | None) -> str:
+    if remaining_s is None:
+        return "—"
+    remaining_s = max(0.0, float(remaining_s))
+    if remaining_s < 1.0:
+        return "<1s"
+    total = int(round(remaining_s))
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"~{h}h {m:02d}m"
+    if m:
+        return f"~{m}m {s:02d}s"
+    return f"~{s}s"
