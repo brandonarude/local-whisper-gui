@@ -57,7 +57,7 @@
 - [x] **20. RED: stitcher tests** — the accuracy-critical suite (§3.7, §6): overlapping synthetic chunks with known ground-truth text → assert no dropped words, no duplicated words, timestamps offset correctly, low-confidence splice logged. Includes an adversarial case where overlap text is repeated phrasing.
 - [x] **21. GREEN: stitcher** — `src/core/stitcher.py` using `difflib.SequenceMatcher` on tokenized overlap.
 - [x] **22. RED: transcriber wrapper tests** — patch `faster_whisper.WhisperModel`; assert lazy load, correct `(model, device, compute_type)` forwarding, segment normalization into our dataclass, cancellation cooperation via an injected `should_cancel` callable.
-- [ ] **23. GREEN: transcriber wrapper** — `src/core/transcriber.py`.
+- [x] **23. GREEN: transcriber wrapper** — `src/core/transcriber.py`.
 
 ## Phase 5 — UI (single commits with smoke tests)
 
