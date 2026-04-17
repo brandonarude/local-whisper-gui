@@ -237,6 +237,18 @@ class SettingsPanel(QWidget):
     def set_chunking_enabled(self, enabled: bool) -> None:
         self._chunking_group.setChecked(enabled)
 
+    def set_min_silence_ms(self, ms: int) -> None:
+        self._min_silence_spin.setValue(int(ms))
+
+    def set_silence_threshold_dbfs(self, dbfs: int) -> None:
+        self._silence_thresh_spin.setValue(int(dbfs))
+
+    def set_min_chunk_minutes(self, minutes: float) -> None:
+        self._min_chunk_spin.setValue(float(minutes))
+
+    def set_max_chunk_minutes(self, minutes: float) -> None:
+        self._max_chunk_spin.setValue(float(minutes))
+
     # --- helpers --------------------------------------------------------
 
     def _set_combo_value(self, combo: QComboBox, data_value: str) -> None:

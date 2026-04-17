@@ -35,6 +35,7 @@ from src.ui.settings_panel import SettingsPanel
 from src.ui.waveform_widget import WaveformWidget
 from src.utils import constants as C
 from src.utils import disk_space
+from src.utils.config import Config
 from src.utils.device_detect import Device, detect_devices
 from src.utils.errors import ErrorKind
 from src.utils.theme import Theme, apply_theme
@@ -51,6 +52,7 @@ class MainWindow(QMainWindow):
         devices: list[Device] | None = None,
         *,
         transcriber_factory=None,
+        config: Config | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle(APP_NAME)
@@ -58,6 +60,7 @@ class MainWindow(QMainWindow):
 
         self._devices = devices if devices is not None else detect_devices()
         self._transcriber_factory = transcriber_factory or _default_transcriber_factory
+        self._config = config
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
@@ -106,6 +109,59 @@ class MainWindow(QMainWindow):
         self._settings_panel.values_changed.connect(self._refresh_chunk_preview)
         self._progress_panel.start_clicked.connect(self._on_start_transcription)
         self._progress_panel.cancel_clicked.connect(self._on_cancel_transcription)
+
+        if self._config is not None:
+            self._apply_config(self._config)
+
+    # --- persistence ----------------------------------------------------
+
+    def _apply_config(self, config: Config) -> None:
+        geom = config.window_geometry()
+        if geom is not None:
+            self.restoreGeometry(geom)
+        state = config.window_state()
+        if state is not None:
+            self.restoreState(state)
+
+        self._settings_panel.set_model(config.model())
+        self._settings_panel.set_device(config.device())
+        self._settings_panel.set_language(config.language())
+        self._settings_panel.set_output_formats(config.output_formats())
+        self._settings_panel.set_include_timestamps(config.include_timestamps())
+        out_dir = config.output_dir()
+        if out_dir:
+            self._settings_panel.set_output_dir(out_dir)
+        self._settings_panel.set_chunking_enabled(config.chunking_enabled())
+        self._settings_panel.set_min_silence_ms(config.min_silence_ms())
+        self._settings_panel.set_silence_threshold_dbfs(config.silence_threshold_dbfs())
+        self._settings_panel.set_min_chunk_minutes(config.min_chunk_minutes())
+        self._settings_panel.set_max_chunk_minutes(config.max_chunk_minutes())
+
+        self.set_theme(config.theme())
+        self._refresh_status_bar()
+
+    def _save_config(self, config: Config) -> None:
+        v = self._settings_panel.values()
+        config.set_model(v.model)
+        config.set_device(v.device_key)
+        config.set_language(v.language)
+        config.set_output_formats(list(v.output_formats))
+        config.set_include_timestamps(v.include_timestamps)
+        if v.output_dir:
+            config.set_output_dir(v.output_dir)
+        config.set_chunking_enabled(v.chunking_enabled)
+        config.set_min_silence_ms(v.min_silence_ms)
+        config.set_silence_threshold_dbfs(v.silence_threshold_dbfs)
+        config.set_min_chunk_minutes(v.min_chunk_minutes)
+        config.set_max_chunk_minutes(v.max_chunk_minutes)
+        config.set_theme(self._current_theme)
+        config.set_window_geometry(self.saveGeometry())
+        config.set_window_state(self.saveState())
+
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        if self._config is not None:
+            self._save_config(self._config)
+        super().closeEvent(event)
 
     # --- file loading ---------------------------------------------------
 

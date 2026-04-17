@@ -81,7 +81,7 @@
 
 - [x] **36. Startup checks** — ffmpeg presence, faster-whisper import, CUDA probe (§5.2, §7); dialogs for each failure mode with "don't show again" for non-fatal warnings.
 - [x] **37. Error handling pass** — OOM retry suggestion, corrupted-file guard, disk-full pre-check before export, model-download retry. Add targeted RED/GREEN pairs for any new pure-logic helpers introduced here.
-- [ ] **38. Settings persistence wire-up** — load on startup, save on close (geometry + all settings-panel values + theme + last output dir).
+- [x] **38. Settings persistence wire-up** — load on startup, save on close (geometry + all settings-panel values + theme + last output dir).
 - [ ] **39. Model cache management** — Settings menu: "Pre-download model" (progress) and "Clear cached models" (confirm + size preview).
 
 ## Phase 8 — Packaging
