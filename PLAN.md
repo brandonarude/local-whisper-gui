@@ -87,7 +87,7 @@
 ## Phase 8 — Packaging
 
 - [x] **40. PyInstaller Linux spec** — `build/build_linux.spec`; README notes ffmpeg as a system dep.
-- [ ] **41. PyInstaller Windows spec** — `build/build_windows.spec`; bundle ffmpeg.exe; document CUDA DLL bundling vs. user-supplied toolkit.
+- [x] **41. PyInstaller Windows spec** — `build/build_windows.spec`; bundle ffmpeg.exe; document CUDA DLL bundling vs. user-supplied toolkit.
 - [ ] **42. README finalization** — install (user + dev), run-from-source, platform build steps, screenshots, §12 success-criteria checklist.
 
 ---
