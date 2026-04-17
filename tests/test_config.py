@@ -160,3 +160,22 @@ def test_values_persist_across_config_instances(temp_settings) -> None:
 
     Config(settings=temp_settings).set_model("medium")
     assert Config(settings=temp_settings).model() == "medium"
+
+
+# --- Suppressed startup warnings ---------------------------------------
+
+def test_default_warning_is_not_suppressed(cfg) -> None:
+    assert cfg.is_warning_suppressed("cuda") is False
+
+
+def test_suppressed_warning_round_trip(cfg) -> None:
+    cfg.set_warning_suppressed("cuda", True)
+    assert cfg.is_warning_suppressed("cuda") is True
+    cfg.set_warning_suppressed("cuda", False)
+    assert cfg.is_warning_suppressed("cuda") is False
+
+
+def test_suppressed_warnings_are_per_key(cfg) -> None:
+    cfg.set_warning_suppressed("cuda", True)
+    assert cfg.is_warning_suppressed("cuda") is True
+    assert cfg.is_warning_suppressed("ffmpeg") is False

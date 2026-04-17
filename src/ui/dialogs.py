@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QUrl
 from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtWidgets import QMessageBox, QWidget
+from PyQt6.QtWidgets import QCheckBox, QMessageBox, QWidget
 
 
 def prompt_chunk_long_file(
@@ -85,6 +85,53 @@ def show_missing_ffmpeg(parent: QWidget | None) -> None:
     )
     box.setStandardButtons(QMessageBox.StandardButton.Ok)
     box.exec()
+
+
+def show_missing_faster_whisper(parent: QWidget | None) -> None:
+    """Fatal: faster-whisper not importable (SPEC §5.2)."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Critical)
+    box.setWindowTitle("faster-whisper not installed")
+    box.setText(
+        "faster-whisper is required for transcription but is not installed."
+    )
+    box.setInformativeText(
+        "Install it into the app's Python environment with "
+        "`pip install faster-whisper`, then relaunch."
+    )
+    box.setStandardButtons(QMessageBox.StandardButton.Ok)
+    box.exec()
+
+
+def show_startup_warning(
+    parent: QWidget | None,
+    *,
+    title: str,
+    message: str,
+    detail: str = "",
+    allow_suppress: bool = True,
+) -> bool:
+    """Non-fatal startup warning with an optional "Don't show again" checkbox.
+
+    Returns True if the user asked to suppress this warning in future
+    launches, False otherwise. When ``allow_suppress`` is False the
+    checkbox is omitted and the return value is always False.
+    """
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle(title)
+    box.setText(message)
+    if detail:
+        box.setInformativeText(detail)
+    box.setStandardButtons(QMessageBox.StandardButton.Ok)
+
+    suppress_cb: QCheckBox | None = None
+    if allow_suppress:
+        suppress_cb = QCheckBox("Don't show this again")
+        box.setCheckBox(suppress_cb)
+
+    box.exec()
+    return bool(suppress_cb is not None and suppress_cb.isChecked())
 
 
 def describe_load_error(path: str | Path, exc: BaseException) -> str:

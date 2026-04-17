@@ -93,6 +93,59 @@ def test_show_missing_ffmpeg_does_not_raise(qtbot) -> None:
         dialogs.show_missing_ffmpeg(None)
 
 
+def test_show_missing_faster_whisper_does_not_raise(qtbot) -> None:
+    from src.ui import dialogs
+
+    with patch.object(QMessageBox, "exec", return_value=0):
+        dialogs.show_missing_faster_whisper(None)
+
+
+def test_show_startup_warning_returns_false_when_unchecked(qtbot) -> None:
+    from src.ui import dialogs
+
+    with patch.object(QMessageBox, "exec", return_value=0):
+        assert (
+            dialogs.show_startup_warning(
+                None, title="t", message="m", detail="d"
+            )
+            is False
+        )
+
+
+def test_show_startup_warning_returns_true_when_suppress_checked(qtbot) -> None:
+    from src.ui import dialogs
+
+    def exec_and_check(self):
+        cb = self.checkBox()
+        if cb is not None:
+            cb.setChecked(True)
+        return 0
+
+    with patch.object(QMessageBox, "exec", exec_and_check):
+        assert (
+            dialogs.show_startup_warning(
+                None, title="t", message="m", detail="d"
+            )
+            is True
+        )
+
+
+def test_show_startup_warning_no_checkbox_when_disallowed(qtbot) -> None:
+    from src.ui import dialogs
+
+    def exec_asserting_no_checkbox(self):
+        assert self.checkBox() is None
+        return 0
+
+    with patch.object(QMessageBox, "exec", exec_asserting_no_checkbox):
+        assert (
+            dialogs.show_startup_warning(
+                None, title="t", message="m", allow_suppress=False
+            )
+            is False
+        )
+
+
 def test_describe_load_error_formats_message(tmp_path: Path) -> None:
     from src.ui.dialogs import describe_load_error
 

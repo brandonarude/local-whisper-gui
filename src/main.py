@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import sys
 
-from src.app import MainWindow, create_application
+from src.app import MainWindow, create_application, handle_startup_checks
 
 
 def main(argv: list[str] | None = None) -> int:
     app = create_application(argv if argv is not None else sys.argv)
+    handle_startup_checks(parent=None)
     window = MainWindow()
     window.show()
     return app.exec()

@@ -123,6 +123,16 @@ class Config:
     def set_window_state(self, value: QByteArray) -> None:
         self._s.setValue("window/state", value)
 
+    # --- suppressed warnings -------------------------------------------
+    # "Don't show again" bookkeeping for non-fatal startup warnings
+    # (SPEC §7). Each warning is keyed by its CheckResult.name, e.g.
+    # "cuda". Fatal errors are never suppressed.
+    def is_warning_suppressed(self, key: str) -> bool:
+        return self._s.value(f"suppressed_warnings/{key}", False, type=bool)
+
+    def set_warning_suppressed(self, key: str, value: bool) -> None:
+        self._s.setValue(f"suppressed_warnings/{key}", bool(value))
+
     def _read_bytes(self, key: str) -> QByteArray | None:
         v = self._s.value(key, None)
         if v is None:
