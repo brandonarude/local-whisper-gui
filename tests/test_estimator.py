@@ -91,10 +91,11 @@ def test_sliding_window_tracks_rate_change() -> None:
         est.update(audio_done_s=audio, wall_elapsed_s=float(i))
 
     # After fast phase, latest obs is (27.5, 10). The window holds wall 6..10
-    # → Δaudio = 25, Δwall = 4, throughput = 6.25. ETA = (200-27.5)/6.25 ≈ 27.6.
+    # → oldest (7.5, 6), newest (27.5, 10); Δaudio = 20, Δwall = 4,
+    # throughput = 5.0. ETA = (200 - 27.5) / 5.0 = 34.5.
     fast_eta = est.remaining()
     assert fast_eta is not None
-    assert fast_eta == pytest.approx((200.0 - 27.5) / 6.25, abs=1e-3)
+    assert fast_eta == pytest.approx((200.0 - 27.5) / 5.0, abs=1e-3)
     assert fast_eta < slow_eta  # slow-phase ETA must have been larger
 
 
