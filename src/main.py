@@ -14,7 +14,11 @@ def _register_bundled_binaries() -> None:
     if not getattr(sys, "frozen", False):
         return
     bundle_dir = Path(sys.executable).resolve().parent
-    os.environ["PATH"] = str(bundle_dir) + os.pathsep + os.environ.get("PATH", "")
+    # PyInstaller 6.x places bundled binaries in the _internal/ subfolder;
+    # older versions put them at the bundle root. Add both to be safe.
+    search_dirs = [bundle_dir, bundle_dir / "_internal"]
+    existing = os.environ.get("PATH", "")
+    os.environ["PATH"] = os.pathsep.join([str(d) for d in search_dirs] + [existing])
 
 
 _register_bundled_binaries()
