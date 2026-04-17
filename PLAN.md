@@ -53,7 +53,7 @@
 - [x] **16. RED: exporter tests** — synthetic `[Segment]` input → asserts `.txt` (with and without timestamps), `.srt` parses back via a minimal SRT parser, `.vtt` starts with `WEBVTT`, `.json` contains word-level data when provided.
 - [x] **17. GREEN: exporter** — `src/core/exporter.py`.
 - [x] **18. RED: ETA estimator tests** — feed synthetic `(audio_secs_done, wall_secs_elapsed)` observations; assert `.remaining()` converges; zero-elapsed returns `None`; handles non-monotonic updates.
-- [ ] **19. GREEN: ETA estimator** — `src/core/estimator.py` sliding-window throughput.
+- [x] **19. GREEN: ETA estimator** — `src/core/estimator.py` sliding-window throughput.
 - [ ] **20. RED: stitcher tests** — the accuracy-critical suite (§3.7, §6): overlapping synthetic chunks with known ground-truth text → assert no dropped words, no duplicated words, timestamps offset correctly, low-confidence splice logged. Includes an adversarial case where overlap text is repeated phrasing.
 - [ ] **21. GREEN: stitcher** — `src/core/stitcher.py` using `difflib.SequenceMatcher` on tokenized overlap.
 - [ ] **22. RED: transcriber wrapper tests** — patch `faster_whisper.WhisperModel`; assert lazy load, correct `(model, device, compute_type)` forwarding, segment normalization into our dataclass, cancellation cooperation via an injected `should_cancel` callable.
