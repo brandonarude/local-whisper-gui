@@ -61,7 +61,7 @@
 
 ## Phase 5 — UI (single commits with smoke tests)
 
-- [ ] **24. Waveform worker** — `src/workers/waveform_worker.py` `QThread`; smoke test with `pytest-qt` `qtbot.waitSignal(samples_ready)` against the `tiny_wav` fixture.
+- [x] **24. Waveform worker** — `src/workers/waveform_worker.py` `QThread`; smoke test with `pytest-qt` `qtbot.waitSignal(samples_ready)` against the `tiny_wav` fixture.
 - [ ] **25. Waveform widget** — `src/ui/waveform_widget.py` pyqtgraph wrapper; smoke test: instantiate, `set_samples`, `set_chunk_boundaries`, assert no exception.
 - [ ] **26. File header + load flow** — "Load Audio File" button, file dialog, metadata labels, waveform wired via worker.
 - [ ] **27. Settings panel** — `src/ui/settings_panel.py`: model / device / language (searchable) / output formats / timestamps toggle / output dir / chunking group.
