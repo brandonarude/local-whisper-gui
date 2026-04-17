@@ -28,6 +28,7 @@ from src.ui.waveform_widget import WaveformWidget
 from src.utils import constants as C
 from src.utils.device_detect import Device, detect_devices
 from src.utils.theme import Theme, apply_theme
+from src.workers.chunk_preview_worker import ChunkPreviewWorker
 from src.workers.waveform_worker import WaveformWorker
 
 APP_NAME = "Local Whisper GUI"
@@ -74,6 +75,7 @@ class MainWindow(QMainWindow):
         self._refresh_status_bar()
 
         self._waveform_worker: WaveformWorker | None = None
+        self._chunk_preview_worker: ChunkPreviewWorker | None = None
         self._current_theme: str = Theme.SYSTEM.value
 
         self._build_menu_bar()
@@ -81,6 +83,7 @@ class MainWindow(QMainWindow):
         self._file_header.file_loaded.connect(self._on_file_loaded)
         self._file_header.load_failed.connect(self._on_load_failed)
         self._settings_panel.values_changed.connect(self._refresh_status_bar)
+        self._settings_panel.values_changed.connect(self._refresh_chunk_preview)
 
     # --- file loading ---------------------------------------------------
 
@@ -90,6 +93,7 @@ class MainWindow(QMainWindow):
         self._progress_panel.reset_progress()
         self._progress_panel.append_log(f"Loaded {info.path.name} ({info.duration_s:.1f}s)")
         self._start_waveform_worker(info)
+        self._refresh_chunk_preview()
 
     def _on_load_failed(self, message: str) -> None:
         QMessageBox.warning(self, "Could not load file", message)
@@ -107,6 +111,50 @@ class MainWindow(QMainWindow):
         worker.finished.connect(worker.deleteLater)
         self._waveform_worker = worker
         worker.start()
+
+    # --- chunk preview --------------------------------------------------
+
+    def _refresh_chunk_preview(self) -> None:
+        info = self._file_header.current_info
+        if info is None:
+            self._waveform.set_chunk_boundaries([])
+            return
+
+        values = self._settings_panel.values()
+        if not values.chunking_enabled:
+            self._cancel_chunk_preview_worker()
+            self._waveform.set_chunk_boundaries([])
+            return
+
+        self._cancel_chunk_preview_worker()
+        worker = ChunkPreviewWorker(
+            info.path,
+            min_silence_ms=values.min_silence_ms,
+            silence_thresh_db=float(values.silence_threshold_dbfs),
+            min_chunk_s=values.min_chunk_minutes * 60.0,
+            max_chunk_s=values.max_chunk_minutes * 60.0,
+            overlap_s=C.CHUNK_OVERLAP_SECONDS,
+            parent=self,
+        )
+        worker.boundaries_ready.connect(self._on_chunk_boundaries_ready)
+        worker.failed.connect(self._on_chunk_preview_failed)
+        worker.finished.connect(worker.deleteLater)
+        self._chunk_preview_worker = worker
+        worker.start()
+
+    def _cancel_chunk_preview_worker(self) -> None:
+        w = self._chunk_preview_worker
+        if w is not None and w.isRunning():
+            w.requestInterruption()
+            w.quit()
+            w.wait(2_000)
+        self._chunk_preview_worker = None
+
+    def _on_chunk_boundaries_ready(self, boundaries: list) -> None:
+        self._waveform.set_chunk_boundaries([float(b) for b in boundaries])
+
+    def _on_chunk_preview_failed(self, message: str) -> None:
+        self._progress_panel.append_log(f"Chunk preview failed: {message}")
 
     # --- status bar -----------------------------------------------------
 

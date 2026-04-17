@@ -69,7 +69,7 @@
 - [x] **29. Main window assembly** — compose all panels; status bar with device/model info.
 - [x] **30. Menu bar + theme toggle** — File, Settings (Theme, Pre-download Model, Clear Cache), Help; help `?` tooltips on Model/Device.
 - [x] **31. Dialogs** — `src/ui/dialogs.py`: >1h chunk recommendation, error dialog, partial-output-on-cancel prompt, missing-ffmpeg startup dialog.
-- [ ] **32. Chunk preview on waveform** — when chunking toggle is on and a file is loaded, compute boundaries in the background and draw them.
+- [x] **32. Chunk preview on waveform** — when chunking toggle is on and a file is loaded, compute boundaries in the background and draw them.
 
 ## Phase 6 — Transcription integration
 
