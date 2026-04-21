@@ -27,6 +27,7 @@ def test_config_values_applied_on_startup(qtbot, config: Config) -> None:
     config.set_language("es")
     config.set_output_formats(["srt", "vtt"])
     config.set_include_timestamps(False)
+    config.set_timestamp_cadence_s(45)
     config.set_chunking_enabled(False)
     config.set_min_silence_ms(1_234)
     config.set_silence_threshold_dbfs(-30)
@@ -41,6 +42,7 @@ def test_config_values_applied_on_startup(qtbot, config: Config) -> None:
     assert v.language == "es"
     assert set(v.output_formats) == {"srt", "vtt"}
     assert v.include_timestamps is False
+    assert v.timestamp_cadence_s == 45
     assert v.chunking_enabled is False
     assert v.min_silence_ms == 1_234
     assert v.silence_threshold_dbfs == -30
@@ -58,6 +60,7 @@ def test_close_persists_settings(qtbot, config: Config, tmp_path: Path) -> None:
     w._settings_panel.set_output_formats(["json"])
     w._settings_panel.set_output_dir(str(tmp_path))
     w._settings_panel.set_include_timestamps(False)
+    w._settings_panel.set_timestamp_cadence_s(120)
 
     w.close()
 
@@ -68,6 +71,7 @@ def test_close_persists_settings(qtbot, config: Config, tmp_path: Path) -> None:
     assert fresh.output_formats() == ["json"]
     assert fresh.output_dir() == str(tmp_path)
     assert fresh.include_timestamps() is False
+    assert fresh.timestamp_cadence_s() == 120
 
 
 def test_window_geometry_round_trip(qtbot, config: Config) -> None:

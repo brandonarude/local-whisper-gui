@@ -62,6 +62,14 @@ class Config:
     def set_include_timestamps(self, value: bool) -> None:
         self._s.setValue("include_timestamps", value)
 
+    def timestamp_cadence_s(self) -> int:
+        return self._s.value(
+            "timestamp_cadence_s", C.DEFAULT_TIMESTAMP_CADENCE_S, type=int
+        )
+
+    def set_timestamp_cadence_s(self, value: int) -> None:
+        self._s.setValue("timestamp_cadence_s", int(value))
+
     def output_dir(self) -> str | None:
         v = self._s.value("output_dir", None)
         return str(v) if v else None

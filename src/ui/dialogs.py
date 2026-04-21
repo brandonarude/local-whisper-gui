@@ -51,6 +51,32 @@ def show_error(
     box.exec()
 
 
+def prompt_cadence_exceeds_duration(
+    parent: QWidget | None, duration_s: float, cadence_s: int
+) -> bool:
+    """Warn that the .txt timestamp cadence is longer than the loaded audio.
+
+    Returns True to proceed (the .txt will contain only a single ``[0:00]``
+    marker); False to cancel so the user can shorten the cadence first.
+    """
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle("Timestamp cadence longer than audio")
+    box.setText(
+        f"The timestamp cadence ({cadence_s}s) is longer than the loaded "
+        f"audio ({duration_s:.1f}s)."
+    )
+    box.setInformativeText(
+        "The .txt transcript will contain only a single timestamp at the "
+        "start. Continue anyway?"
+    )
+    yes = box.addButton("Continue", QMessageBox.ButtonRole.AcceptRole)
+    box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(yes)
+    box.exec()
+    return box.clickedButton() is yes
+
+
 def prompt_partial_output_on_cancel(
     parent: QWidget | None, completed_chunks: int, total_chunks: int
 ) -> bool:

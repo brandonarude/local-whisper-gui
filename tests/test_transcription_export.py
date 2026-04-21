@@ -82,6 +82,11 @@ def test_successful_run_writes_selected_formats(
         "show_export_complete",
         lambda parent, out_dir, files: export_calls.append((out_dir, list(files))),
     )
+    monkeypatch.setattr(
+        mw_mod.dialogs,
+        "prompt_cadence_exceeds_duration",
+        lambda *a, **kw: True,
+    )
 
     out_dir = tmp_path / "outs"
     fake = FakeTranscriber([[_seg(0.0, 0.5, "hello world")]])
@@ -131,6 +136,10 @@ def test_cancel_declined_skips_export(
         mw_mod.dialogs, "show_export_complete",
         lambda *a, **kw: export_complete_calls.append(a),
     )
+    monkeypatch.setattr(
+        mw_mod.dialogs, "prompt_cadence_exceeds_duration",
+        lambda *a, **kw: True,
+    )
 
     out_dir = tmp_path / "partials"
     gate = threading.Event()
@@ -179,6 +188,10 @@ def test_cancel_accepted_writes_partial_files(
         lambda parent, completed, total: True,
     )
     monkeypatch.setattr(mw_mod.dialogs, "show_export_complete", lambda *a, **kw: None)
+    monkeypatch.setattr(
+        mw_mod.dialogs, "prompt_cadence_exceeds_duration",
+        lambda *a, **kw: True,
+    )
 
     out_dir = tmp_path / "partials"
     gate = threading.Event()

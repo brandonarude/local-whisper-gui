@@ -41,6 +41,7 @@ class SettingsValues:
     language: str  # ISO code or C.AUTO_DETECT_LANGUAGE
     output_formats: tuple[str, ...]
     include_timestamps: bool
+    timestamp_cadence_s: int
     output_dir: str | None
     chunking_enabled: bool
     min_silence_ms: int
@@ -130,6 +131,29 @@ class SettingsPanel(QWidget):
         self._timestamps_check.stateChanged.connect(self._emit_changed)
         output_layout.addWidget(self._timestamps_check)
 
+        cadence_row = QHBoxLayout()
+        cadence_row.setContentsMargins(24, 0, 0, 0)
+        self._cadence_label = QLabel("Timestamp every:")
+        self._cadence_spin = QSpinBox()
+        self._cadence_spin.setRange(
+            C.MIN_TIMESTAMP_CADENCE_S, C.MAX_TIMESTAMP_CADENCE_S
+        )
+        self._cadence_spin.setSingleStep(5)
+        self._cadence_spin.setSuffix(" s")
+        self._cadence_spin.setValue(C.DEFAULT_TIMESTAMP_CADENCE_S)
+        self._cadence_spin.setToolTip(
+            "Insert a [M:SS] marker every N seconds of audio in the .txt "
+            "transcript. If set longer than the loaded file, only a single "
+            "marker appears and a warning is shown at transcription start."
+        )
+        self._cadence_spin.valueChanged.connect(self._emit_changed)
+        self._timestamps_check.toggled.connect(self._sync_cadence_enabled)
+        cadence_row.addWidget(self._cadence_label)
+        cadence_row.addWidget(self._cadence_spin)
+        cadence_row.addStretch(1)
+        output_layout.addLayout(cadence_row)
+        self._sync_cadence_enabled(self._timestamps_check.isChecked())
+
         dir_row = QHBoxLayout()
         dir_row.addWidget(QLabel("Output dir:"))
         self._output_dir_edit = QLineEdit()
@@ -206,6 +230,7 @@ class SettingsPanel(QWidget):
             language=self._language_combo.currentData() or C.DEFAULT_LANGUAGE,
             output_formats=formats,
             include_timestamps=self._timestamps_check.isChecked(),
+            timestamp_cadence_s=int(self._cadence_spin.value()),
             output_dir=dir_text if dir_text else None,
             chunking_enabled=self._chunking_group.isChecked(),
             min_silence_ms=self._min_silence_spin.value(),
@@ -230,6 +255,9 @@ class SettingsPanel(QWidget):
 
     def set_include_timestamps(self, enabled: bool) -> None:
         self._timestamps_check.setChecked(enabled)
+
+    def set_timestamp_cadence_s(self, seconds: int) -> None:
+        self._cadence_spin.setValue(int(seconds))
 
     def set_output_dir(self, path: str | None) -> None:
         self._output_dir_edit.setText(path or "")
@@ -258,6 +286,10 @@ class SettingsPanel(QWidget):
 
     def _emit_changed(self, *_args) -> None:
         self.values_changed.emit()
+
+    def _sync_cadence_enabled(self, enabled: bool) -> None:
+        self._cadence_label.setEnabled(bool(enabled))
+        self._cadence_spin.setEnabled(bool(enabled))
 
     def _row(self, *widgets: QWidget) -> QWidget:
         row = QWidget()
