@@ -128,6 +128,17 @@ def test_default_include_timestamps_is_true(cfg) -> None:
     assert cfg.include_timestamps() is True
 
 
+def test_round_trip_timestamp_cadence(cfg) -> None:
+    cfg.set_timestamp_cadence_s(90)
+    assert cfg.timestamp_cadence_s() == 90
+
+
+def test_default_timestamp_cadence_matches_constants(cfg) -> None:
+    from src.utils.constants import DEFAULT_TIMESTAMP_CADENCE_S
+
+    assert cfg.timestamp_cadence_s() == DEFAULT_TIMESTAMP_CADENCE_S
+
+
 def test_default_chunking_params_match_constants(cfg) -> None:
     from src.utils import constants as C
 
