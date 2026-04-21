@@ -13,13 +13,19 @@ Time formatting helpers:
   for VTT.
 - :func:`_fmt_ms` renders ``M:SS`` for the optional timestamp prefix in the
   plain-text writer.
+
+Plain-text timestamp cadence (issue #5): when timestamps are enabled,
+``write_txt`` emits one ``[M:SS]``-prefixed line per ``timestamp_cadence_s``
+window rather than one per faster-whisper segment. Word-level timings are
+used to split inside a segment when available, so a single huge segment
+still gets regular timestamps instead of a single marker at 0:00.
 """
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Iterator, Sequence
 
 
 @dataclass(frozen=True)
@@ -56,23 +62,88 @@ def _fmt_ms(seconds: float) -> str:
     return f"{total // 60}:{total % 60:02d}"
 
 
+DEFAULT_TIMESTAMP_CADENCE_S: float = 30.0
+
+
 def write_txt(
     segments: Sequence[Segment],
     path: str | Path,
     *,
     include_timestamps: bool,
+    timestamp_cadence_s: float = DEFAULT_TIMESTAMP_CADENCE_S,
 ) -> None:
+    if not include_timestamps:
+        lines = [seg.text.strip() for seg in segments]
+        body = "\n".join(lines)
+        if body:
+            body += "\n"
+        Path(path).write_text(body, encoding="utf-8")
+        return
+
+    if timestamp_cadence_s <= 0:
+        raise ValueError("timestamp_cadence_s must be > 0")
+
     lines: list[str] = []
-    for seg in segments:
-        text = seg.text.strip()
-        if include_timestamps:
-            lines.append(f"[{_fmt_ms(seg.start)}] {text}")
+    block_start: float | None = None
+    block_parts: list[str] = []
+
+    def flush() -> None:
+        if block_start is None or not block_parts:
+            return
+        text = " ".join(p for p in block_parts if p).strip()
+        lines.append(f"[{_fmt_ms(block_start)}] {text}")
+
+    for start, text in _timestamp_atoms(segments):
+        if not text:
+            continue
+        if block_start is None:
+            block_start = start
+            block_parts = [text]
+            continue
+        if start - block_start >= timestamp_cadence_s:
+            flush()
+            block_start = start
+            block_parts = [text]
         else:
-            lines.append(text)
+            block_parts.append(text)
+    flush()
+
     body = "\n".join(lines)
     if body:
         body += "\n"
     Path(path).write_text(body, encoding="utf-8")
+
+
+def _timestamp_atoms(
+    segments: Sequence[Segment],
+) -> Iterator[tuple[float, str]]:
+    """Yield ``(start_s, text)`` atoms for cadenced txt output.
+
+    Word-level timings are preferred so a single large segment can be
+    split mid-way on a word boundary; segments without words fall back to
+    one atom per segment (the cadence can only snap at segment boundaries
+    in that case).
+    """
+    for seg in segments:
+        if seg.words:
+            for w in seg.words:
+                yield (float(w.start), w.text.strip())
+        else:
+            yield (float(seg.start), seg.text.strip())
+
+
+def cadence_exceeds_duration(
+    duration_s: float, cadence_s: float
+) -> bool:
+    """True when ``cadence_s`` is longer than the audio ``duration_s``.
+
+    The UI keys its "cadence longer than audio" warning off this predicate.
+    A non-positive duration is treated as exceeded so a caller that doesn't
+    yet know the duration still surfaces the warning.
+    """
+    if duration_s <= 0:
+        return True
+    return float(cadence_s) > float(duration_s)
 
 
 def write_srt(segments: Sequence[Segment], path: str | Path) -> None:
