@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Sequence
 
+from src.utils.constants import DEFAULT_TIMESTAMP_CADENCE_S
+
 
 @dataclass(frozen=True)
 class Word:
@@ -60,9 +62,6 @@ def _fmt_ms(seconds: float) -> str:
         seconds = 0.0
     total = int(seconds)
     return f"{total // 60}:{total % 60:02d}"
-
-
-DEFAULT_TIMESTAMP_CADENCE_S: float = 30.0
 
 
 def write_txt(

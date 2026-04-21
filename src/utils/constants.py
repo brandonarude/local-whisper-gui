@@ -150,3 +150,11 @@ LONG_FILE_PROMPT_THRESHOLD_SECONDS: int = 60 * 60  # 1 hour (SPEC §3.3)
 # Output formats the exporter writes (SPEC §3.7).
 OUTPUT_FORMATS: tuple[str, ...] = ("txt", "srt", "vtt", "json")
 DEFAULT_OUTPUT_FORMATS: tuple[str, ...] = ("txt", "srt")
+
+# Plain-text timestamp cadence (issue #5): insert a ``[M:SS]`` marker
+# every N seconds of audio. The settings spinbox is reckoned in seconds
+# to match the expected range (a few seconds up to a couple of minutes);
+# longer cadences than the loaded audio trigger a UI warning.
+DEFAULT_TIMESTAMP_CADENCE_S: int = 30
+MIN_TIMESTAMP_CADENCE_S: int = 5
+MAX_TIMESTAMP_CADENCE_S: int = 600
