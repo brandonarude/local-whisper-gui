@@ -101,6 +101,10 @@ def test_start_runs_transcription_and_populates_results(
     # Export dialogs are modal QMessageBoxes — stub them out so the
     # completed-path doesn't block the test.
     monkeypatch.setattr(mw_mod.dialogs, "show_export_complete", lambda *a, **kw: None)
+    monkeypatch.setattr(
+        mw_mod.dialogs, "prompt_cadence_exceeds_duration",
+        lambda *a, **kw: True,
+    )
 
     fake = FakeTranscriber([[_seg(0.0, 0.5, "hello"), _seg(0.5, 1.0, "world")]])
     w = MainWindow(devices=_devices(), transcriber_factory=_factory(fake))
@@ -134,6 +138,10 @@ def test_cancel_preserves_completed_chunks(
     monkeypatch.setattr(
         mw_mod.dialogs, "prompt_partial_output_on_cancel",
         lambda parent, completed, total: False,
+    )
+    monkeypatch.setattr(
+        mw_mod.dialogs, "prompt_cadence_exceeds_duration",
+        lambda *a, **kw: True,
     )
 
     gate = threading.Event()
@@ -176,3 +184,37 @@ def test_cancel_preserves_completed_chunks(
     # Buttons reset to ready state after cancel.
     assert w._progress_panel._start_button.isEnabled()
     assert not w._progress_panel._cancel_button.isEnabled()
+
+
+def test_start_warns_when_cadence_longer_than_audio(
+    qtbot, tiny_wav: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.ui import main_window as mw_mod
+    from src.ui.main_window import MainWindow
+
+    prompts: list[tuple[float, int]] = []
+
+    def fake_prompt(parent, duration_s, cadence_s):
+        prompts.append((float(duration_s), int(cadence_s)))
+        return False  # user cancels
+
+    monkeypatch.setattr(
+        mw_mod.dialogs, "prompt_cadence_exceeds_duration", fake_prompt
+    )
+
+    fake = FakeTranscriber([[_seg(0.0, 0.5, "hello")]])
+    w = MainWindow(devices=_devices(), transcriber_factory=_factory(fake))
+    qtbot.addWidget(w)
+    w._settings_panel.set_chunking_enabled(False)
+    # tiny_wav is 1s; default cadence is 30s → warning must fire.
+    w._file_header.load_path(tiny_wav)
+    w._waveform_worker.wait(5_000)
+
+    w._progress_panel._start_button.click()
+
+    assert prompts, "cadence warning should have been shown"
+    duration_s, cadence_s = prompts[0]
+    assert cadence_s == 30
+    assert duration_s < cadence_s
+    # User declined → no transcription worker was spawned.
+    assert w._transcription_worker is None

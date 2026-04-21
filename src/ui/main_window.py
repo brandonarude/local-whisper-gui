@@ -130,6 +130,7 @@ class MainWindow(QMainWindow):
         self._settings_panel.set_language(config.language())
         self._settings_panel.set_output_formats(config.output_formats())
         self._settings_panel.set_include_timestamps(config.include_timestamps())
+        self._settings_panel.set_timestamp_cadence_s(config.timestamp_cadence_s())
         out_dir = config.output_dir()
         if out_dir:
             self._settings_panel.set_output_dir(out_dir)
@@ -149,6 +150,7 @@ class MainWindow(QMainWindow):
         config.set_language(v.language)
         config.set_output_formats(list(v.output_formats))
         config.set_include_timestamps(v.include_timestamps)
+        config.set_timestamp_cadence_s(v.timestamp_cadence_s)
         if v.output_dir:
             config.set_output_dir(v.output_dir)
         config.set_chunking_enabled(v.chunking_enabled)
@@ -389,6 +391,17 @@ class MainWindow(QMainWindow):
             return
 
         values = self._settings_panel.values()
+        if (
+            values.include_timestamps
+            and "txt" in values.output_formats
+            and exporter.cadence_exceeds_duration(
+                info.duration_s, values.timestamp_cadence_s
+            )
+        ):
+            if not dialogs.prompt_cadence_exceeds_duration(
+                self, info.duration_s, values.timestamp_cadence_s
+            ):
+                return
         device, compute_type = _split_device_key(values.device_key)
         transcriber = self._transcriber_factory(
             model=values.model, device=device, compute_type=compute_type
@@ -564,7 +577,10 @@ class MainWindow(QMainWindow):
         stem = info.path.stem + (".partial" if partial else "")
         writers = {
             "txt": lambda p: exporter.write_txt(
-                segments, p, include_timestamps=values.include_timestamps
+                segments,
+                p,
+                include_timestamps=values.include_timestamps,
+                timestamp_cadence_s=values.timestamp_cadence_s,
             ),
             "srt": lambda p: exporter.write_srt(segments, p),
             "vtt": lambda p: exporter.write_vtt(segments, p),
