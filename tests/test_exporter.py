@@ -82,6 +82,166 @@ def test_txt_with_timestamps_includes_them(tmp_path: Path) -> None:
     assert re.search(r"\d{1,2}:\d{2}", content)
 
 
+# --- .txt timestamp cadence -----------------------------------------------
+
+_TS_LINE = re.compile(r"^\[(\d+):(\d{2})\]\s+(.*)$")
+
+
+def _parse_txt_lines(content: str):
+    """Return [(seconds, text), ...] for each timestamp line in ``content``."""
+    out = []
+    for line in content.splitlines():
+        m = _TS_LINE.match(line)
+        if m:
+            out.append((int(m.group(1)) * 60 + int(m.group(2)), m.group(3)))
+    return out
+
+
+def _long_single_segment_with_words(duration_s: float = 120.0, step_s: float = 1.0):
+    """One big segment spanning 0..duration_s with a word every ``step_s`` seconds."""
+    from src.core.exporter import Segment, Word
+
+    words = []
+    t = 0.0
+    i = 0
+    while t < duration_s:
+        words.append(Word(start=t, end=min(t + step_s, duration_s), text=f"w{i}", probability=1.0))
+        t += step_s
+        i += 1
+    text = " ".join(w.text for w in words)
+    return [Segment(start=0.0, end=duration_s, text=text, words=tuple(words))]
+
+
+def _many_short_segments(total_s: float = 60.0, seg_s: float = 5.0):
+    """Many 5-second segments with no word timings covering 0..total_s."""
+    from src.core.exporter import Segment
+
+    segs = []
+    t = 0.0
+    i = 0
+    while t + seg_s <= total_s + 1e-9:
+        segs.append(Segment(start=t, end=t + seg_s, text=f"part {i}.", words=None))
+        t += seg_s
+        i += 1
+    return segs
+
+
+def test_txt_timestamp_cadence_defaults_to_30s(tmp_path: Path) -> None:
+    from src.core.exporter import write_txt
+
+    out = tmp_path / "out.txt"
+    write_txt(_long_single_segment_with_words(120.0), out, include_timestamps=True)
+
+    content = out.read_text(encoding="utf-8")
+    lines = _parse_txt_lines(content)
+    # 120s audio at 30s cadence → timestamps at 0, 30, 60, 90.
+    assert [secs for secs, _ in lines] == [0, 30, 60, 90]
+
+
+def test_txt_timestamp_cadence_custom_interval(tmp_path: Path) -> None:
+    from src.core.exporter import write_txt
+
+    out = tmp_path / "out.txt"
+    write_txt(
+        _long_single_segment_with_words(60.0),
+        out,
+        include_timestamps=True,
+        timestamp_cadence_s=15,
+    )
+
+    lines = _parse_txt_lines(out.read_text(encoding="utf-8"))
+    assert [secs for secs, _ in lines] == [0, 15, 30, 45]
+
+
+def test_txt_timestamp_cadence_groups_short_segments(tmp_path: Path) -> None:
+    from src.core.exporter import write_txt
+
+    out = tmp_path / "out.txt"
+    write_txt(
+        _many_short_segments(total_s=60.0, seg_s=5.0),
+        out,
+        include_timestamps=True,
+        timestamp_cadence_s=30,
+    )
+
+    lines = _parse_txt_lines(out.read_text(encoding="utf-8"))
+    # 12 short 5-second segments should collapse to two cadence groups.
+    assert [secs for secs, _ in lines] == [0, 30]
+
+
+def test_txt_timestamp_cadence_preserves_all_text(tmp_path: Path) -> None:
+    from src.core.exporter import write_txt
+
+    segs = _many_short_segments(total_s=60.0, seg_s=5.0)
+    out = tmp_path / "out.txt"
+    write_txt(segs, out, include_timestamps=True, timestamp_cadence_s=30)
+
+    content = out.read_text(encoding="utf-8")
+    for seg in segs:
+        assert seg.text in content
+
+
+def test_txt_timestamp_cadence_longer_than_audio_single_line(tmp_path: Path) -> None:
+    from src.core.exporter import write_txt
+
+    out = tmp_path / "out.txt"
+    write_txt(
+        _many_short_segments(total_s=20.0, seg_s=5.0),
+        out,
+        include_timestamps=True,
+        timestamp_cadence_s=60,
+    )
+
+    lines = _parse_txt_lines(out.read_text(encoding="utf-8"))
+    assert len(lines) == 1
+    assert lines[0][0] == 0
+
+
+def test_txt_timestamp_cadence_rejects_non_positive(tmp_path: Path) -> None:
+    from src.core.exporter import write_txt
+
+    out = tmp_path / "out.txt"
+    with pytest.raises(ValueError):
+        write_txt(
+            _sample_segments(),
+            out,
+            include_timestamps=True,
+            timestamp_cadence_s=0,
+        )
+    with pytest.raises(ValueError):
+        write_txt(
+            _sample_segments(),
+            out,
+            include_timestamps=True,
+            timestamp_cadence_s=-5,
+        )
+
+
+def test_txt_timestamp_cadence_ignored_when_timestamps_disabled(tmp_path: Path) -> None:
+    from src.core.exporter import write_txt
+
+    out = tmp_path / "out.txt"
+    # Passing a bogus cadence must not raise when timestamps are off.
+    write_txt(
+        _sample_segments(),
+        out,
+        include_timestamps=False,
+        timestamp_cadence_s=0,
+    )
+    content = out.read_text(encoding="utf-8")
+    assert not re.search(r"\[\d+:\d{2}\]", content)
+
+
+def test_cadence_exceeds_duration_helper() -> None:
+    from src.core.exporter import cadence_exceeds_duration
+
+    assert cadence_exceeds_duration(20.0, 30) is True
+    assert cadence_exceeds_duration(30.0, 30) is False
+    assert cadence_exceeds_duration(120.0, 30) is False
+    # Zero or unknown duration → treat as exceeded (caller should warn).
+    assert cadence_exceeds_duration(0.0, 30) is True
+
+
 # --- .srt ------------------------------------------------------------------
 
 
